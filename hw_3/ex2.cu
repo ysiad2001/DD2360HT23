@@ -5,7 +5,7 @@
 #include <iostream>
 
 #define DataType float
-#define ERROR_MARGIN (0.00001)
+#define ERROR_MARGIN (0.0001)
 
 #define NUM_THREAD_X (32)
 #define NUM_THREAD_Y (32)
@@ -14,7 +14,7 @@
 __global__ void gemm(DataType *A, DataType *B, DataType *C, int numARows,
                      int numAColumns, int numBRows, int numBColumns)
 {
-    //@@ Insert code to implement matrix multiplication here
+    // Matrix multiplication
     int column = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     if ((column >= numBColumns) || (row >= numARows))
@@ -26,6 +26,7 @@ __global__ void gemm(DataType *A, DataType *B, DataType *C, int numARows,
     }
 }
 
+// Random float from fMin to fMax
 DataType fRand(DataType fMin, DataType fMax)
 {
     DataType f = (DataType)rand() / RAND_MAX;
@@ -66,12 +67,12 @@ int main(int argc, char **argv)
 
     printf("Input matrix dim (%d x %d) (%d x %d) (%d x %d)\n", numARows, numAColumns, numBRows, numBColumns, numCRows, numCColumns);
 
-    //@@ Insert code below to allocate Host memory for input and output
+    // Allocate Host memory for input and output
     hostA = (DataType *)malloc(sizeof(DataType) * numARows * numAColumns);
     hostB = (DataType *)malloc(sizeof(DataType) * numBRows * numBColumns);
     hostC = (DataType *)malloc(sizeof(DataType) * numCRows * numCColumns);
     resultRef = (DataType *)malloc(sizeof(DataType) * numCRows * numCColumns);
-    //@@ Insert code below to initialize hostA and hostB to random numbers, and create reference result in CPU
+    // Initialize hostA and hostB to random numbers, and create reference result in CPU
     for (int i = 0; i < numARows; i++)
     {
         for (int j = 0; j < numAColumns; j++)
@@ -100,46 +101,45 @@ int main(int argc, char **argv)
         }
     }
 
-    //@@ Insert code below to allocate GPU memory here
+    // Allocate GPU memory
     cudaMalloc(&deviceA, sizeof(DataType) * numAColumns * numARows);
     cudaMalloc(&deviceB, sizeof(DataType) * numBColumns * numBRows);
     cudaMalloc(&deviceC, sizeof(DataType) * numCColumns * numCRows);
 
     gettimeofday(&time1, NULL);
 
-    //@@ Insert code to below to Copy memory to the GPU here
+    // Copy memory to the GPU 
     cudaMemcpy(deviceA, hostA, sizeof(DataType) * numAColumns * numARows, cudaMemcpyHostToDevice);
     cudaMemcpy(deviceB, hostB, sizeof(DataType) * numBColumns * numBRows, cudaMemcpyHostToDevice);
     cudaMemcpy(deviceC, hostC, sizeof(DataType) * numCColumns * numCRows, cudaMemcpyHostToDevice);
 
-    //@@ Initialize the grid and block dimensions here
+    // Initialize the grid and block dimensions
     int numThreadX = NUM_THREAD_X;
     int numThreadY = NUM_THREAD_Y;
     int numBlockX = (numCColumns + NUM_THREAD_X - 1) / NUM_THREAD_X;
     int numBlockY = (numCRows + NUM_THREAD_Y - 1) / NUM_THREAD_Y;
 
     gettimeofday(&time2, NULL);
-    //@@ Launch the GPU Kernel here
+    // Launch the GPU Kernel
     gemm<<<dim3(numBlockX, numBlockY, 1), dim3(numThreadX, numThreadY, 1)>>>(deviceA, deviceB, deviceC, numARows, numAColumns, numBRows, numBColumns);
     cudaDeviceSynchronize();
     gettimeofday(&time3, NULL);
 
-    //@@ Copy the GPU memory back to the CPU here
-
+    // Copy the GPU memory back to the CPU
     cudaMemcpy(hostC, deviceC, sizeof(DataType) * numCColumns * numCRows, cudaMemcpyDeviceToHost);
     gettimeofday(&time4, NULL);
 
     double duration;
     duration = time2.tv_sec * 1000000 + time2.tv_usec - (time1.tv_sec * 1000000 + time1.tv_usec);
-    std::cout << "Duration is " << duration << std::endl;
+    std::cout << "Host to Device copy time is " << duration << std::endl;
 
     duration = time3.tv_sec * 1000000 + time3.tv_usec - (time2.tv_sec * 1000000 + time2.tv_usec);
-    std::cout << "Duration is " << duration << std::endl;
+    std::cout << "Kernel time is " << duration << std::endl;
 
     duration = time4.tv_sec * 1000000 + time4.tv_usec - (time3.tv_sec * 1000000 + time3.tv_usec);
-    std::cout << "Duration is " << duration << std::endl;
+    std::cout << "Host to Device copy time is " << duration << std::endl;
 
-    //@@ Insert code below to compare the output with the reference
+    // Compare the output with the reference
 
     for (int i = 0; i < numCRows; i++)
     {
@@ -152,12 +152,10 @@ int main(int argc, char **argv)
         }
     }
 
-    //@@ Free the GPU memory here
+    // Cleanup
     cudaFree(deviceA);
     cudaFree(deviceB);
     cudaFree(deviceC);
-
-    //@@ Free the CPU memory here
     free(hostA);
     free(hostB);
     free(hostC);

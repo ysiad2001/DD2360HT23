@@ -10,9 +10,9 @@ nvcc ex1.cu -o ex1
 
 For a vector length of N, there will be ``N/NUM_THREAD`` floating operations performed in each vector add kernel.
 
-There do not seem to be any global memory read, as there is not even global variable used in this program.
+For every kernel, there will be ``2*N/NUM_THREAD`` memory read from the host. To be more exact, the data are copied from the host to the device, and being read at the device.
 
-For a vector length of 1024, there is 1 block with 256 threads used. These can be configured by changing the macro.
+In my implementation, for a vector length of 1024, there is 1 block with 1024 threads used. These can be configured by changing the macro.
 
 After profiling the program with Nvidia Nsight by inputting
 ```
