@@ -3,9 +3,15 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#define THREAD_PER_BLOCK 64
-
-void cudaMemcpyParticlesHostToDevice(particles *const d_particle, const particles *const h_particle)
+#define THREAD_PER_BLOCK 32
+#define CUDA_CALL(F)                                    \
+    if ((F) != cudaSuccess)                             \
+    {                                                   \
+        printf("Error at line %d: %s\n", __LINE__,      \
+               cudaGetErrorString(cudaGetLastError())); \
+        exit(-1);                                       \
+    };
+void cudaMemcpyParticlesHostToDevice(particles **const d_particle, const particles *const h_particle)
 {
     /*
     INPUT SPECIFICATIONS:
@@ -30,7 +36,7 @@ void cudaMemcpyParticlesHostToDevice(particles *const d_particle, const particle
     FPpart *d_w;
 
     // Allocate the memory for these devices
-    CUDA_CALL(cudaMalloc((void **)&d_particle, sizeof(particles)));
+    CUDA_CALL(cudaMalloc((void **)d_particle, sizeof(particles)));
     CUDA_CALL(cudaMalloc((void **)&d_x, sizeof(FPpart) * h_particle->npmax));
     CUDA_CALL(cudaMalloc((void **)&d_y, sizeof(FPpart) * h_particle->npmax));
     CUDA_CALL(cudaMalloc((void **)&d_z, sizeof(FPpart) * h_particle->npmax));
@@ -55,10 +61,10 @@ void cudaMemcpyParticlesHostToDevice(particles *const d_particle, const particle
     h_particle_copy->w = d_w;
 
     // Copy the h_particle_copy struct to the device
-    CUDA_CALL(cudaMemcpy(d_particle, h_particle_copy, sizeof(particles), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(*d_particle, h_particle_copy, sizeof(particles), cudaMemcpyHostToDevice));
 }
 
-void cudaMemcpyParticlesDeviceToHost(particles *const h_particle, particles *const d_particle)
+void cudaMemcpyParticlesDeviceToHost(particles *const h_particle, particles **const d_particle)
 {
     /*
     INPUT SPECIFICATIONS:
@@ -76,10 +82,10 @@ void cudaMemcpyParticlesDeviceToHost(particles *const h_particle, particles *con
     particles *h_particle_copy = &h_particle_copy_instance;
 
     // Copy the d_particle from device to host
-    CUDA_CALL(cudaMemcpy(h_particle, d_particle, sizeof(particles), cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(h_particle, *d_particle, sizeof(particles), cudaMemcpyDeviceToHost));
 
     // Free the d_particle pointer
-    CUDA_CALL(cudaFree(d_particle));
+    CUDA_CALL(cudaFree(*d_particle));
 
     // Copy the pointers from device to host
     CUDA_CALL(cudaMemcpy(h_particle_copy->x, h_particle->x, sizeof(int) * h_particle->npmax, cudaMemcpyDeviceToHost));
@@ -106,7 +112,7 @@ void cudaMemcpyParticlesDeviceToHost(particles *const h_particle, particles *con
     h_particle->w = h_particle_copy->w;
 }
 
-void cudaMemcpyGridHostToDevice(grid *const d_grid, const grid *const h_grid)
+void cudaMemcpyGridHostToDevice(grid **const d_grid, const grid *const h_grid)
 {
     /*
     INPUT SPECIFICATIONS:
@@ -127,7 +133,7 @@ void cudaMemcpyGridHostToDevice(grid *const d_grid, const grid *const h_grid)
     FPfield *d_ZN_flat;
 
     // Allocate the memory for these devices
-    CUDA_CALL(cudaMalloc((void **)&d_grid, sizeof(grid)));
+    CUDA_CALL(cudaMalloc((void **)d_grid, sizeof(grid)));
     size_t arraySize = sizeof(FPfield) * h_grid->nxn * h_grid->nyn * h_grid->nzn;
     CUDA_CALL(cudaMalloc((void **)&d_XN_flat, arraySize));
     CUDA_CALL(cudaMalloc((void **)&d_YN_flat, arraySize));
@@ -144,10 +150,10 @@ void cudaMemcpyGridHostToDevice(grid *const d_grid, const grid *const h_grid)
     h_grid_copy->ZN_flat = d_ZN_flat;
 
     // Copy the h_grid_copy struct to the device
-    CUDA_CALL(cudaMemcpy(d_grid, h_grid_copy, sizeof(grid), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(*d_grid, h_grid_copy, sizeof(grid), cudaMemcpyHostToDevice));
 }
 
-void cudaFreeGrid(grid *const d_grid)
+void cudaFreeGrid(grid **const d_grid)
 {
     /*
     INPUT SPECIFICATIONS:
@@ -163,10 +169,10 @@ void cudaFreeGrid(grid *const d_grid)
     grid *h_grid = &h_grid_instance;
 
     // Copy the d_grid from device to host
-    CUDA_CALL(cudaMemcpy(h_grid, d_grid, sizeof(grid), cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(h_grid, *d_grid, sizeof(grid), cudaMemcpyDeviceToHost));
 
     // Free the d_grid pointer
-    CUDA_CALL(cudaFree(d_grid));
+    CUDA_CALL(cudaFree(*d_grid));
 
     // Free the XN_flat, YN_flat, ZN_flat pointers
     CUDA_CALL(cudaFree(h_grid->XN_flat));
@@ -174,7 +180,7 @@ void cudaFreeGrid(grid *const d_grid)
     CUDA_CALL(cudaFree(h_grid->ZN_flat));
 }
 
-void cudaMemcpyEMfieldHostToDevice(EMfield *const d_EMfield, const EMfield *const h_EMfield, const grid *const h_grid)
+void cudaMemcpyEMfieldHostToDevice(EMfield **const d_EMfield, const EMfield *const h_EMfield, const grid *const h_grid)
 {
     /*
     SPECS similar to cudaMemcpyGridHostToDevice
@@ -193,7 +199,7 @@ void cudaMemcpyEMfieldHostToDevice(EMfield *const d_EMfield, const EMfield *cons
 
     // Allocate the memory for these devices
     size_t arraySize = sizeof(FPfield) * h_grid->nxn * h_grid->nyn * h_grid->nzn;
-    CUDA_CALL(cudaMalloc((void **)&d_EMfield, sizeof(EMfield)));
+    CUDA_CALL(cudaMalloc((void **)d_EMfield, sizeof(EMfield)));
     CUDA_CALL(cudaMalloc((void **)&d_Ex_flat, arraySize));
     CUDA_CALL(cudaMalloc((void **)&d_Ey_flat, arraySize));
     CUDA_CALL(cudaMalloc((void **)&d_Ez_flat, arraySize));
@@ -218,10 +224,10 @@ void cudaMemcpyEMfieldHostToDevice(EMfield *const d_EMfield, const EMfield *cons
     h_EMfield_copy->Bzn_flat = d_Bzn_flat;
 
     // Copy the h_EMfield_copy struct to the device
-    CUDA_CALL(cudaMemcpy(d_EMfield, h_EMfield_copy, sizeof(EMfield), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(*d_EMfield, h_EMfield_copy, sizeof(EMfield), cudaMemcpyHostToDevice));
 }
 
-void cudaFreeEMfield(EMfield *const d_EMfield)
+void cudaFreeEMfield(EMfield **const d_EMfield)
 {
     /*
     SPECS similar to cudaFreeGridDeviceToHost
@@ -232,10 +238,10 @@ void cudaFreeEMfield(EMfield *const d_EMfield)
     EMfield *h_EMfield = &h_EMfield_instance;
 
     // Copy the d_EMfield from device to host
-    CUDA_CALL(cudaMemcpy(h_EMfield, d_EMfield, sizeof(EMfield), cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(h_EMfield, *d_EMfield, sizeof(EMfield), cudaMemcpyDeviceToHost));
 
     // Free the d_EMfield pointer
-    CUDA_CALL(cudaFree(d_EMfield));
+    CUDA_CALL(cudaFree(*d_EMfield));
 
     // Free the Ex_flat, Ey_flat, Ez_flat, Bxn_flat, Byn_flat, Bzn_flat pointers
     CUDA_CALL(cudaFree(h_EMfield->Ex_flat));
@@ -246,7 +252,7 @@ void cudaFreeEMfield(EMfield *const d_EMfield)
     CUDA_CALL(cudaFree(h_EMfield->Bzn_flat));
 }
 
-void cudaShallowMemcpyParamHostToDevice(parameters *const d_param, const parameters *const h_param)
+void cudaShallowMemcpyParamHostToDevice(parameters **const d_param, const parameters *const h_param)
 {
     /*
     INPUT SPECIFICATIONS:
@@ -257,11 +263,11 @@ void cudaShallowMemcpyParamHostToDevice(parameters *const d_param, const paramet
     FUNCTIONALITY:
     Shallow Copy the h_param to device as d_param, while allocating memory for d_param.
     */
-    CUDA_CALL(cudaMalloc((void **)&d_param, sizeof(parameters)));
-    CUDA_CALL(cudaMemcpy(d_param, h_param, sizeof(parameters), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc((void **)d_param, sizeof(parameters)));
+    CUDA_CALL(cudaMemcpy(*d_param, h_param, sizeof(parameters), cudaMemcpyHostToDevice));
 }
 
-void cudaShallowFreeParam(parameters *const d_param)
+void cudaShallowFreeParam(parameters **const d_param)
 {
     /*
     INPUT SPECIFICATIONS:
@@ -271,7 +277,7 @@ void cudaShallowFreeParam(parameters *const d_param)
     FUNCTIONALITY:
     Shallow clean d_param.
     */
-    CUDA_CALL(cudaFree((void **)&d_param));
+    CUDA_CALL(cudaFree(*d_param));
 }
 
 /** allocate particle arrays */
@@ -670,31 +676,6 @@ void interpP2G(struct particles *part, struct interpDensSpecies *ids, struct gri
     }
 }
 
-/** particle mover */
-int mover_PC_gpu(struct particles *part, struct EMfield *field, struct grid *grd, struct parameters *param)
-{
-    std::cout << "***  MOVER with SUBCYCLYING " << param->n_sub_cycles << " - species " << part->species_ID << " ***" << std::endl;
-    particles *d_part;
-    EMfield *d_field;
-    grid *d_grd;
-    parameters *d_param;
-
-    cudaMemcpyParticlesHostToDevice(d_part, part);
-    cudaMemcpyEMfieldHostToDevice(d_field, field, grd);
-    cudaMemcpyGridHostToDevice(d_grd, grd);
-    cudaShallowMemcpyParamHostToDevice(d_param, param);
-
-    mover_PC_gpu_kernel<<<((part->nop / THREAD_PER_BLOCK) + 1), THREAD_PER_BLOCK>>>(d_part, d_field, d_grd, d_param);
-    cudaDeviceSynchronize();
-
-    cudaMemcpyParticlesDeviceToHost(part, d_part);
-    cudaFreeEMfield(d_field);
-    cudaFreeGrid(d_grd);
-    cudaShallowFreeParam(d_param);
-
-    return 0;
-} // end of the mover
-
 __global__ void mover_PC_gpu_kernel(struct particles *part, struct EMfield *field, struct grid *grd, struct parameters *param)
 {
     const unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -733,12 +714,12 @@ __global__ void mover_PC_gpu_kernel(struct particles *part, struct EMfield *fiel
 
             // calculate weights
 
-            xi[0] = part->x[i] - grd->XN[ix - 1][iy][iz];
-            eta[0] = part->y[i] - grd->YN[ix][iy - 1][iz];
-            zeta[0] = part->z[i] - grd->ZN[ix][iy][iz - 1];
-            xi[1] = grd->XN[ix][iy][iz] - part->x[i];
-            eta[1] = grd->YN[ix][iy][iz] - part->y[i];
-            zeta[1] = grd->ZN[ix][iy][iz] - part->z[i];
+            xi[0] = part->x[i] - grd->XN_flat[get_idx(ix - 1, iy, iz, grd->nyn, grd->nzn)];
+            eta[0] = part->y[i] - grd->YN_flat[get_idx(ix, iy - 1, iz, grd->nyn, grd->nzn)];
+            zeta[0] = part->z[i] - grd->ZN_flat[get_idx(ix, iy, iz - 1, grd->nyn, grd->nzn)];
+            xi[1] = grd->XN_flat[get_idx(ix, iy, iz, grd->nyn, grd->nzn)] - part->x[i];
+            eta[1] = grd->YN_flat[get_idx(ix, iy, iz, grd->nyn, grd->nzn)] - part->y[i];
+            zeta[1] = grd->ZN_flat[get_idx(ix, iy, iz, grd->nyn, grd->nzn)] - part->z[i];
             for (int ii = 0; ii < 2; ii++)
                 for (int jj = 0; jj < 2; jj++)
                     for (int kk = 0; kk < 2; kk++)
@@ -751,12 +732,12 @@ __global__ void mover_PC_gpu_kernel(struct particles *part, struct EMfield *fiel
                 for (int jj = 0; jj < 2; jj++)
                     for (int kk = 0; kk < 2; kk++)
                     {
-                        Exl += weight[ii][jj][kk] * field->Ex[ix - ii][iy - jj][iz - kk];
-                        Eyl += weight[ii][jj][kk] * field->Ey[ix - ii][iy - jj][iz - kk];
-                        Ezl += weight[ii][jj][kk] * field->Ez[ix - ii][iy - jj][iz - kk];
-                        Bxl += weight[ii][jj][kk] * field->Bxn[ix - ii][iy - jj][iz - kk];
-                        Byl += weight[ii][jj][kk] * field->Byn[ix - ii][iy - jj][iz - kk];
-                        Bzl += weight[ii][jj][kk] * field->Bzn[ix - ii][iy - jj][iz - kk];
+                        Exl += weight[ii][jj][kk] * field->Ex_flat[get_idx(ix-ii, iy-jj, iz-kk, grd->nyn, grd->nzn)];
+                        Eyl += weight[ii][jj][kk] * field->Ey_flat[get_idx(ix-ii, iy-jj, iz-kk, grd->nyn, grd->nzn)];
+                        Ezl += weight[ii][jj][kk] * field->Ez_flat[get_idx(ix-ii, iy-jj, iz-kk, grd->nyn, grd->nzn)];
+                        Bxl += weight[ii][jj][kk] * field->Bxn_flat[get_idx(ix-ii, iy-jj, iz-kk, grd->nyn, grd->nzn)];
+                        Byl += weight[ii][jj][kk] * field->Byn_flat[get_idx(ix-ii, iy-jj, iz-kk, grd->nyn, grd->nzn)];
+                        Bzl += weight[ii][jj][kk] * field->Bzn_flat[get_idx(ix-ii, iy-jj, iz-kk, grd->nyn, grd->nzn)];
                     }
 
             // end interpolation
@@ -871,3 +852,28 @@ __global__ void mover_PC_gpu_kernel(struct particles *part, struct EMfield *fiel
         }
     } // end of subcycling
 } // end of mover gpu kernel
+
+/** particle mover */
+int mover_PC_gpu(struct particles *part, struct EMfield *field, struct grid *grd, struct parameters *param)
+{
+    std::cout << "***  MOVER with SUBCYCLYING " << param->n_sub_cycles << " - species " << part->species_ID << " ***" << std::endl;
+    particles *d_part;
+    EMfield *d_field;
+    grid *d_grd;
+    parameters *d_param;
+
+    cudaMemcpyParticlesHostToDevice(&d_part, part);
+    cudaMemcpyEMfieldHostToDevice(&d_field, field, grd);
+    cudaMemcpyGridHostToDevice(&d_grd, grd);
+    cudaShallowMemcpyParamHostToDevice(&d_param, param);
+
+    mover_PC_gpu_kernel<<<((part->nop / THREAD_PER_BLOCK) + 1), THREAD_PER_BLOCK>>>(d_part, d_field, d_grd, d_param);
+    cudaDeviceSynchronize();
+
+    cudaMemcpyParticlesDeviceToHost(part, &d_part);
+    cudaFreeEMfield(&d_field);
+    cudaFreeGrid(&d_grd);
+    cudaShallowFreeParam(&d_param);
+
+    return 0;
+} // end of the mover

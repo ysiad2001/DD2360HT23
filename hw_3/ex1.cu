@@ -1,124 +1,127 @@
 
 #include <stdio.h>
-#include <iostream>
-#include <cstdlib>
 #include <sys/time.h>
-#include <cassert>
+#include <random>
 
-#define DataType double
-#define ERROR_MARGIN (0.00001)
-#define NUM_BLOCK (1)
-#define NUM_THREAD (256)
+#define NUM_BINS (8)
 
-double fRand(double fMin, double fMax)
+#define NUM_BLOCKS (1)// This can only be 1, having multiple blocks will cause unsynced shared memory between blocks
+#define NUM_THREADS_PER_BLOCK (1024)
+#define NUM_THREADS (NUM_THREADS_PER_BLOCK * NUM_BLOCKS)
+
+__global__ void histogram_kernel(unsigned int *input, unsigned int *bins, unsigned int num_elements, unsigned int num_bins)
 {
-    double f = (double)rand() / RAND_MAX;
-    return fMin + f * (fMax - fMin);
-}
 
-__global__ void vecAdd(DataType *in1, DataType *in2, DataType *out, int len)
-{
-    //@@ Insert code to implement vector addition here
-    for (int i = threadIdx.x; i < len; i += blockDim.x)
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x; // thread ID
+
+    __shared__ unsigned int shared_bins[NUM_BINS];
+
+    __syncthreads();
+    for (unsigned binId = threadId; binId < NUM_BINS; binId += NUM_THREADS)
     {
-        out[i] = in1[i] + in2[i];
+        shared_bins[binId] = 0;
+    }
+    __syncthreads();
+    for (unsigned inputId = threadId; inputId < num_elements; inputId += NUM_THREADS)
+    {
+        atomicAdd(&shared_bins[input[inputId]], 1);
+    }
+    __syncthreads();
+    for (unsigned binId = threadId; binId < NUM_BINS; binId += NUM_THREADS)
+    {
+        atomicAdd(&bins[binId], shared_bins[binId]);
     }
 }
 
-//@@ Insert code to implement timer start
-
-//@@ Insert code to implement timer stop
+__global__ void convert_kernel(unsigned int *bins, unsigned int num_bins)
+{
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    for (unsigned binId = threadId; binId < NUM_BINS; binId += NUM_THREADS)
+    {
+        if (bins[binId] > 127)
+            bins[binId] = 127;
+    }
+}
 
 int main(int argc, char **argv)
 {
-    struct timeval time1;
-    struct timeval time2;
-    struct timeval time3;
-    struct timeval time4;
-
-    
 
     int inputLength;
-    DataType *hostInput1;
-    DataType *hostInput2;
-    DataType *hostOutput;
-    DataType *resultRef;
-    DataType *deviceInput1;
-    DataType *deviceInput2;
-    DataType *deviceOutput;
+    unsigned int *hostInput;
+    unsigned int *hostBins;
+    unsigned int *resultRef;
+    unsigned int *deviceInput;
+    unsigned int *deviceBins;
 
-    //@@ Insert code below to read in inputLength from args
-    assert(argc == 2);
+    // Read in inputLength from args
     inputLength = atoi(argv[1]);
     printf("The input length is %d\n", inputLength);
 
-    //@@ Insert code below to allocate Host memory for input and output
-    hostInput1 = (double *)malloc(sizeof(DataType) * inputLength);
-    hostInput2 = (double *)malloc(sizeof(DataType) * inputLength);
-    hostOutput = (double *)malloc(sizeof(DataType) * inputLength);
-    resultRef = (double *)malloc(sizeof(DataType) * inputLength);
-    //@@ Insert code below to initialize hostInput1 and hostInput2 to random numbers, and create reference result in CPU
-    for (unsigned i = 0; i < inputLength; ++i)
+    // Allocate Host memory for input and output
+    hostInput = (unsigned int *)malloc(sizeof(unsigned int) * inputLength);
+    hostBins = (unsigned int *)malloc(sizeof(unsigned int) * NUM_BINS);
+
+    // Initialize hostInput to random numbers whose values range from 0 to (NUM_BINS - 1)
+    for (int i = 0; i < inputLength; i++)
     {
-        hostInput1[i] = fRand(0, 1);
-        hostInput2[i] = fRand(0, 1);
-        hostOutput[i] = 0;
-        resultRef[i] = hostInput1[i] + hostInput2[i];
-    }
-    
-    //@@ Insert code below to allocate GPU memory here
-    cudaMalloc(&deviceInput1, sizeof(DataType) * inputLength);
-    cudaMalloc(&deviceInput2, sizeof(DataType) * inputLength);
-    cudaMalloc(&deviceOutput, sizeof(DataType) * inputLength);
-
-    gettimeofday(&time1, NULL);
-
-    //@@ Insert code to below to Copy memory to the GPU here
-    cudaMemcpy(deviceInput1, hostInput1, sizeof(DataType) * inputLength, cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceInput2, hostInput2, sizeof(DataType) * inputLength, cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceOutput, hostOutput, sizeof(DataType) * inputLength, cudaMemcpyHostToDevice);
-
-    //@@ Initialize the 1D grid and block dimensions here
-    int numBlock = NUM_BLOCK;
-    int numThread = NUM_THREAD;
-
-    gettimeofday(&time2, NULL);
-
-    //@@ Launch the GPU Kernel here
-    vecAdd<<<numBlock, numThread>>>(deviceInput1, deviceInput2, deviceOutput, inputLength);
-    //@@ Copy the GPU memory back to the CPU here
-    cudaDeviceSynchronize();
-    gettimeofday(&time3, NULL);
-
-    cudaMemcpy(hostOutput, deviceOutput, sizeof(DataType) * inputLength, cudaMemcpyDeviceToHost);
-    gettimeofday(&time4, NULL);
-
-    double duration = 0;
-    duration = time2.tv_sec * 1000000 + time2.tv_usec - (time1.tv_sec * 1000000 + time1.tv_usec);
-    std::cout << "Duration 1 is " << duration << std::endl;
-
-    duration = time3.tv_sec * 1000000 + time3.tv_usec - (time2.tv_sec * 1000000 + time2.tv_usec);
-    std::cout << "Duration 2 is " << duration << std::endl;
-
-    duration = time4.tv_sec * 1000000 + time4.tv_usec - (time3.tv_sec * 1000000 + time3.tv_usec);
-    std::cout << "Duration 3 is " << duration << std::endl;
-
-    //@@ Insert code below to compare the output with the reference
-    for (unsigned i = 0; i < inputLength; ++i)
-    {
-        if (resultRef[i] - hostOutput[i] > (ERROR_MARGIN) || resultRef[i] - hostOutput[i] < -(ERROR_MARGIN))
-            printf("Error in output[%d] by %f\n", i, (resultRef[i] - hostOutput[i]));
+        hostInput[i] = rand() % NUM_BINS;
     }
 
-    //@@ Free the GPU memory here
-    cudaFree(deviceInput1);
-    cudaFree(deviceInput2);
-    cudaFree(deviceOutput);
+    // Create reference result in CPU
+    resultRef = (unsigned int *)malloc(sizeof(unsigned int) * NUM_BINS);
+    for (int i = 0; i < NUM_BINS; i++)
+    {
+        resultRef[i] = 0;
+        hostBins[i] = 0;
+    }
+    for (int i = 0; i < inputLength; i++)
+    {
+        ++resultRef[hostInput[i]];
+    }
+    for (int i = 0; i < NUM_BINS; i++)
+    {
+        if (resultRef[i] > 127)
+            resultRef[i] = 127;
+    }
 
-    //@@ Free the CPU memory here
-    free(hostInput1);
-    free(hostInput2);
-    free(hostOutput);
+    // Allocate GPU memory
+    cudaMalloc((void **)&deviceInput, sizeof(unsigned int) * inputLength);
+    cudaMalloc((void **)&deviceBins, sizeof(unsigned int) * NUM_BINS);
+
+    // Copy memory to the GPU
+    cudaMemcpy(deviceInput, hostInput, sizeof(unsigned int) * inputLength, cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceBins, hostBins, sizeof(unsigned int) * NUM_BINS, cudaMemcpyHostToDevice);
+
+    // Launch the GPU Kernel
+    histogram_kernel<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>>(deviceInput, deviceBins, inputLength, NUM_BINS);
+
+    // Launch the second GPU Kernel
+    convert_kernel<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>>(deviceBins, NUM_BINS);
+
+    // Copy the GPU memory back to the CPU
+    cudaMemcpy(hostBins, deviceBins, sizeof(unsigned int) * NUM_BINS, cudaMemcpyDeviceToHost);
+
+    // Compare the output with the reference
+    bool correctFlag = true;
+    for (int i = 0; i < NUM_BINS; i++)
+    {
+        if (hostBins[i] != resultRef[i])
+        {
+            correctFlag = false;
+            printf("The results are INCORRECT, at position %d, hostBins[i] = %d, resultRef[i] = %d.\n",i,hostBins[i],resultRef[i]);
+            break;
+        }
+        printf("%d,",hostBins[i]);
+    }
+    if (correctFlag)
+        printf("The results are CORRECT.\n");
+
+    // Cleanup
+    cudaFree(deviceInput);
+    cudaFree(deviceBins);
+    free(hostInput);
+    free(hostBins);
+    free(resultRef);
 
     return 0;
 }

@@ -23,6 +23,52 @@ __global__ void test_kernel(struct my_list *d_list)
     atomicAdd(&d_list->arr[2], 1919810);
 }
 
+void cudaMemcpyListHostToDevice(my_list **d_list, my_list *h_list)
+{
+    // Initiate the h_listCopy for later use
+    my_list dummyList;
+    my_list *h_listCopy = &dummyList;
+
+    // Shallow Copy the content of h_list to h_listCopy
+    *h_listCopy = *h_list;
+
+    // Allocate the device variables
+    int *d_arr;
+    CUDA_CALL(cudaMalloc((void **)&d_arr, sizeof(int) * h_list->num));
+    CUDA_CALL(cudaMalloc((void **)d_list, sizeof(my_list)));
+
+    // Copy the array from host to device
+    CUDA_CALL(cudaMemcpy(d_arr, h_list->arr, sizeof(int) * h_list->num, cudaMemcpyHostToDevice));
+
+    // Redirect the h_listCopy->arr pointer to a device array
+    h_listCopy->arr = d_arr;
+
+    // Copy the h_listCopy from host to device
+    CUDA_CALL(cudaMemcpy(*d_list, h_listCopy, sizeof(my_list), cudaMemcpyHostToDevice));
+}
+
+void cudaMemcpyListDeviceToHost(my_list *h_list, my_list **d_list)
+{
+    // Save a copy of h_listCopy, all pointers in there are allocated to host memory
+    my_list dummyList;
+    my_list *h_listCopy = &dummyList;
+
+    *h_listCopy = *h_list;
+
+    // Copy the d_list from device to host
+    CUDA_CALL(cudaMemcpy(h_list, *d_list, sizeof(my_list), cudaMemcpyDeviceToHost));
+
+    // Copy the array from device to host
+    CUDA_CALL(cudaMemcpy(h_listCopy->arr, h_list->arr, sizeof(int) * h_list->num, cudaMemcpyDeviceToHost));
+
+    CUDA_CALL(cudaFree(h_list->arr));
+
+    // Redirect the h_list->arr pointer to a host array
+    h_list->arr = h_listCopy->arr;
+
+    CUDA_CALL(cudaFree(*d_list));
+}
+
 int main()
 {
     // Initialize the h_list needed to be processed on
@@ -33,45 +79,11 @@ int main()
     h_list->arr[1] = 1;
     h_list->arr[2] = 2;
 
-    // Initiate the h_listCopy for later use
-    my_list dummyList;
-    my_list *h_listCopy = &dummyList;
-
-    // Shallow Copy the content of h_list to h_listCopy
-    *h_listCopy = *h_list;
-
-    // Allocate the device variables
-    int *d_arr;
-    struct my_list *d_list;
-    CUDA_CALL(cudaMalloc((void **)&d_arr, sizeof(int) * h_list->num));
-    CUDA_CALL(cudaMalloc((void **)&d_list, sizeof(my_list)));
-    
-    // Copy the array from host to device
-    CUDA_CALL(cudaMemcpy(d_arr, h_list->arr, sizeof(int) * h_list->num, cudaMemcpyHostToDevice));
-
-    // Redirect the h_listCopy->arr pointer to a device array
-    h_listCopy->arr = d_arr;
-
-    // Copy the h_listCopy from host to device
-    CUDA_CALL(cudaMemcpy(d_list, h_listCopy, sizeof(my_list), cudaMemcpyHostToDevice));
-
+    my_list *d_list;
+    cudaMemcpyListHostToDevice(&d_list, h_list);
     test_kernel<<<1, 1>>>(d_list);
 
-    // Save a copy of h_listCopy, all pointers in there are allocated to host memory
-    *h_listCopy = *h_list;
-
-    // Copy the d_list from device to host
-    CUDA_CALL(cudaMemcpy(h_list, d_list, sizeof(my_list), cudaMemcpyDeviceToHost));
-
-    // Copy the array from device to host
-    CUDA_CALL(cudaMemcpy(h_listCopy->arr, h_list->arr, sizeof(int) * h_list->num, cudaMemcpyDeviceToHost));
-
-    // Redirect the h_list->arr pointer to a host array
-    h_list->arr = h_listCopy->arr;
-
-    CUDA_CALL(cudaFree(d_arr));
-    CUDA_CALL(cudaFree(d_list));
-
+    cudaMemcpyListDeviceToHost(h_list, &d_list);
     cout << h_list->num << endl;
     cout << h_list->arr[0] << endl;
     cout << h_list->arr[1] << endl;
