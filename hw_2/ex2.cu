@@ -3,6 +3,8 @@
 #include <sys/time.h>
 #include <cassert>
 #include <iostream>
+#include "../cuda_utils.h"
+
 
 #define DataType float
 #define ERROR_MARGIN (0.0001)
@@ -35,12 +37,6 @@ DataType fRand(DataType fMin, DataType fMax)
 
 int main(int argc, char **argv)
 {
-
-    struct timeval time1;
-    struct timeval time2;
-    struct timeval time3;
-    struct timeval time4;
-
     DataType *hostA;     // The A matrix
     DataType *hostB;     // The B matrix
     DataType *hostC;     // The output C matrix
@@ -106,41 +102,34 @@ int main(int argc, char **argv)
     cudaMalloc(&deviceB, sizeof(DataType) * numBColumns * numBRows);
     cudaMalloc(&deviceC, sizeof(DataType) * numCColumns * numCRows);
 
-    gettimeofday(&time1, NULL);
-
-    // Copy memory to the GPU 
-    cudaMemcpy(deviceA, hostA, sizeof(DataType) * numAColumns * numARows, cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceB, hostB, sizeof(DataType) * numBColumns * numBRows, cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceC, hostC, sizeof(DataType) * numCColumns * numCRows, cudaMemcpyHostToDevice);
-
     // Initialize the grid and block dimensions
     int numThreadX = NUM_THREAD_X;
     int numThreadY = NUM_THREAD_Y;
     int numBlockX = (numCColumns + NUM_THREAD_X - 1) / NUM_THREAD_X;
     int numBlockY = (numCRows + NUM_THREAD_Y - 1) / NUM_THREAD_Y;
 
-    gettimeofday(&time2, NULL);
+    // Copy memory to the GPU 
+    START_TIMER;
+    cudaMemcpy(deviceA, hostA, sizeof(DataType) * numAColumns * numARows, cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceB, hostB, sizeof(DataType) * numBColumns * numBRows, cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceC, hostC, sizeof(DataType) * numCColumns * numCRows, cudaMemcpyHostToDevice);
+    END_TIMER;
+    PRINT_TIMER("Host to Device copy time");
+
     // Launch the GPU Kernel
+    START_TIMER;
     gemm<<<dim3(numBlockX, numBlockY, 1), dim3(numThreadX, numThreadY, 1)>>>(deviceA, deviceB, deviceC, numARows, numAColumns, numBRows, numBColumns);
     cudaDeviceSynchronize();
-    gettimeofday(&time3, NULL);
-
+    END_TIMER;
+    PRINT_TIMER("Kernel time");
+    
     // Copy the GPU memory back to the CPU
+    START_TIMER;
     cudaMemcpy(hostC, deviceC, sizeof(DataType) * numCColumns * numCRows, cudaMemcpyDeviceToHost);
-    gettimeofday(&time4, NULL);
-
-    double duration;
-    duration = time2.tv_sec * 1000000 + time2.tv_usec - (time1.tv_sec * 1000000 + time1.tv_usec);
-    std::cout << "Host to Device copy time is " << duration << std::endl;
-
-    duration = time3.tv_sec * 1000000 + time3.tv_usec - (time2.tv_sec * 1000000 + time2.tv_usec);
-    std::cout << "Kernel time is " << duration << std::endl;
-
-    duration = time4.tv_sec * 1000000 + time4.tv_usec - (time3.tv_sec * 1000000 + time3.tv_usec);
-    std::cout << "Host to Device copy time is " << duration << std::endl;
+    END_TIMER;
+    PRINT_TIMER("Host to Device copy time");
 
     // Compare the output with the reference
-
     for (int i = 0; i < numCRows; i++)
     {
         for (int j = 0; j < numCColumns; j++)

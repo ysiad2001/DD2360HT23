@@ -1,4 +1,4 @@
-# Assignment III: CUDA Basics II
+# Assignment II: CUDA Basics I
 
 ## Exercise 1 First CUDA program and GPU performance metrics
 
@@ -9,15 +9,15 @@ nvcc ex1.cu -o ex1
 ./ex1
 ```
 
-For a vector length of N, there will be ``N/NUM_THREAD`` floating operations performed in each vector add kernel.
+For a vector length of N, there will be ``1`` floating operations performed in each vector add kernel.
 
-For every kernel, there will be ``2*N/NUM_THREAD`` memory read from the host. To be more exact, the data are copied from the host to the device, and being read at the device.
+For every kernel, there will be ``2`` memory read from the host. To be more exact, the data are copied from the host to the device, and being read at the device.
 
-In my implementation, for a vector length of 1024, there is 1 block with 1024 threads used. These can be configured by changing the macro.
+In my implementation, for a vector length of ``1024``, there is ``4`` block with ``256`` threads used. These can be configured by changing the macro.
 
 After profiling the program with Nvidia Nsight by inputting
 ```
-!/usr/local/cuda-11/bin/nv-nsight-cu-cli ./ex1 1024
+/usr/local/cuda-11/bin/nv-nsight-cu-cli ./ex1 1024
 ```
 We see the achieved occupancy is 23.87\%.
 
@@ -29,7 +29,7 @@ The input length is 131070
 Duration is 379
 ```
 
-The CUDA threads and blocks are stillthe same as the previous part.
+There will be ``inputSize/THREAD_PER_BLOCK+1`` threads.
 
 Now the achieved occupancy is 24.97\%.
 
