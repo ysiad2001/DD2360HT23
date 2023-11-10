@@ -1,5 +1,7 @@
 # Assignment II: CUDA Basics I
 
+<https://github.com/ysiad2001/DD2360HT23/tree/master/hw_2>
+
 ## Exercise 1 First CUDA program and GPU performance metrics
 
 The program is compiled and run by
@@ -43,9 +45,9 @@ Some application of matrix multiplication include neural network, solution of li
 
 There are ``numAColumns`` number of floating point multiplications in a kernel.
 
-Again, there do not seem to be any global memory read, as there is not even global variable used in this program.
+There are ``numAColumns * 3`` global memory reads in each kernel. 
 
-For a matrix A of (128x128) and B of (128x128), there are 1 block and 32 threads used. The achieved occupancy is  99.60\%.
+For a matrix A of (128x128) and B of (128x128), there are 16 block and 1024 threads in each block used. The achieved occupancy is  99.60\%.
  
 For a matrix A of (511x1023) and B of (1023x4094), it still work.
 
@@ -53,10 +55,7 @@ There are ``((numCColumns + NUM_THREAD_X - 1) / NUM_THREAD_X)*((numCRows + NUM_T
 
 The achieved occupancy is  99.76\%.
  
-Further increase the size of matrix A and B, plot a stacked bar chart showing the breakdown of time including (1) data copy from host to device (2) the CUDA kernel (3) data copy from device to host. For this, you will need to add simple CPU timers to your code regions. Explain what you observe.
-Now, change DataType from double to float, re-plot the a stacked bar chart showing the time breakdown. Explain what you observe. 
-
-The plot for double data type is
+Further increasing the size of matrix A and B, the plot for double data type is
 ![image](./ex2_1.png)
 It looks like when the matrix size is large, the time spent tends to be polynomialy progressing. At smaller matrix sizes, the time spent varies. Also, memory copy takes much time.
 

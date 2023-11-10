@@ -1,5 +1,7 @@
 # Assignment IV: Advanced CUDA
 
+<https://github.com/ysiad2001/DD2360HT23/tree/master/hw_4>
+
 ## Exercise 1 - Thread Scheduling and Execution Efficiency 
 
 ### X=800 Y=600 16X16 grid

@@ -1,7 +1,6 @@
 #include "../cuda_utils.h"
 
-#define N 1024
-#define THREAD_PER_BLOCK 16 // cannot be larger than 1024
+#define THREAD_PER_BLOCK 256 // cannot be larger than 1024
 #define NUM_STREAMS 4
 
 __global__ void add(int *a, int *b, int *c, int streamSize)
@@ -13,8 +12,9 @@ __global__ void add(int *a, int *b, int *c, int streamSize)
     }
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    int inputSize = atoi(argv[1]);
     // host copies of variables a, b & c
     int *a, *b, *c, *c_ref;
 
@@ -23,18 +23,18 @@ int main()
     int size = sizeof(int);
 
     // Allocate space for host copies of a, b, c
-    a = (int *)malloc(size * N);
-    b = (int *)malloc(size * N);
-    c = (int *)malloc(size * N);
-    c_ref = (int *)malloc(size * N);
+    a = (int *)malloc(size * inputSize);
+    b = (int *)malloc(size * inputSize);
+    c = (int *)malloc(size * inputSize);
+    c_ref = (int *)malloc(size * inputSize);
 
     // Allocate space for device copies of a, b, c
-    CUDA_CALL(cudaMalloc((void **)&d_a, size * N));
-    CUDA_CALL(cudaMalloc((void **)&d_b, size * N));
-    CUDA_CALL(cudaMalloc((void **)&d_c, size * N));
+    CUDA_CALL(cudaMalloc((void **)&d_a, size * inputSize));
+    CUDA_CALL(cudaMalloc((void **)&d_b, size * inputSize));
+    CUDA_CALL(cudaMalloc((void **)&d_c, size * inputSize));
 
     // Setup input values and reference
-    for (unsigned i = 0; i < N; ++i)
+    for (unsigned i = 0; i < inputSize; ++i)
     {
         a[i] = rand();
         b[i] = rand();
@@ -44,9 +44,9 @@ int main()
     // Create streams
     START_TIMER;
     cudaStream_t streams[NUM_STREAMS];
-    size_t streamSize = (N + NUM_STREAMS - 1) / NUM_STREAMS;
+    size_t streamSize = (inputSize + NUM_STREAMS - 1) / NUM_STREAMS;
     size_t streamSizeByte = sizeof(int) * streamSize;
-    size_t lastStreamSize = N - streamSize * (NUM_STREAMS - 1);
+    size_t lastStreamSize = inputSize - streamSize * (NUM_STREAMS - 1);
     size_t lastStreamSizeByte = sizeof(int) * lastStreamSize;
     for (int i = 0; i < NUM_STREAMS; i++)
     {
@@ -80,6 +80,7 @@ int main()
         offset = i * streamSize;
         add<<<streamSize / THREAD_PER_BLOCK + 1, THREAD_PER_BLOCK, 0, streams[i]>>>(d_a + offset, d_b + offset, d_c + offset, streamSize);
     }
+    CUDA_CALL(cudaDeviceSynchronize());
     END_TIMER;
     PRINT_TIMER("Kernel Time");
 
@@ -100,7 +101,7 @@ int main()
     END_TIMER;
     PRINT_TIMER("Device to Host Memcpy Time");
 
-    for (unsigned i = 0; i < N; ++i)
+    for (unsigned i = 0; i < inputSize; ++i)
     {
         if (c_ref[i] != c[i])
         {
