@@ -1,6 +1,6 @@
 #include "../cuda_utils.h"
 
-#define N 16
+#define N 1024
 #define THREAD_PER_BLOCK 16 // cannot be larger than 1024
 #define NUM_STREAMS 4
 

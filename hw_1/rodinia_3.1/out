@@ -1,28 +1,28 @@
 
-/mnt/e/dd2360/hw_2/ex_4/rodinia_3.1$
+/mnt/e/dd2360/hw_1/rodinia_3.1$
 Reading File
 Error Reading graph file
 
-/mnt/e/dd2360/hw_2/ex_4/rodinia_3.1/cuda/bfs$
+/mnt/e/dd2360/hw_1/rodinia_3.1/cuda/bfs$
 Reading File
 Error Reading graph file
 
-/mnt/e/dd2360/hw_2/ex_4/rodinia_3.1/openmp/hotspot$
+/mnt/e/dd2360/hw_1/rodinia_3.1/openmp/hotspot$
 
-/mnt/e/dd2360/hw_2/ex_4/rodinia_3.1/cuda/hotspot$
+/mnt/e/dd2360/hw_1/rodinia_3.1/cuda/hotspot$
 
-/mnt/e/dd2360/hw_2/ex_4/rodinia_3.1/openmp/lud$
+/mnt/e/dd2360/hw_1/rodinia_3.1/openmp/lud$
 Generate input matrix internally, size =8000
 Creating matrix internally size=8000
 running OMP on host
-Time consumed(ms): 6792.814000
+Time consumed(ms): 4786.388000
 
-/mnt/e/dd2360/hw_2/ex_4/rodinia_3.1/cuda/lud$
+/mnt/e/dd2360/hw_1/rodinia_3.1/cuda/lud$
 WG size of kernel = 32 X 32
 Generate input matrix internally, size =256
 Creating matrix internally size=256
 Before LUD
-Time consumed(ms): 0.003000
+Time consumed(ms): 0.002000
 After LUD
 >>>Verify<<<<
 dismatch at (1, 0): (o)9.990005 (n)99.900047
@@ -65305,9 +65305,9 @@ dismatch at (255, 252): (o)9.970045 (n)19815.212891
 dismatch at (255, 253): (o)9.980020 (n)19895.205078
 dismatch at (255, 254): (o)9.990005 (n)19975.222656
 dismatch at (255, 255): (o)10.000000 (n)19965.255859
-openmp bfs .050876632
-openmp hotspot .044566891
-openmp lud 6.875940257
-cuda bfs .066139858
-cuda hotspot .060349877
-cuda lud .138005874
+openmp bfs .012930275
+openmp hotspot .011799687
+openmp lud 4.844630205
+cuda bfs .020630979
+cuda hotspot .027041768
+cuda lud .115070103
