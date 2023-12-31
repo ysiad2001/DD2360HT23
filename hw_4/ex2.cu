@@ -1,12 +1,14 @@
 #include "../cuda_utils.h"
 
 #define THREAD_PER_BLOCK 256 // cannot be larger than 1024
-#define NUM_STREAMS 4
 
-__global__ void add(int *a, int *b, int *c, int streamSize)
+size_t numStreams = 4;
+size_t segSize = 0;
+
+__global__ void add(int *a, int *b, int *c,int segSize)
 {
     unsigned threadId = blockIdx.x * blockDim.x + threadIdx.x;
-    if (threadId < streamSize)
+    if (threadId < segSize)
     {
         c[threadId] = a[threadId] + b[threadId];
     }
@@ -15,6 +17,8 @@ __global__ void add(int *a, int *b, int *c, int streamSize)
 int main(int argc, char **argv)
 {
     int inputSize = atoi(argv[1]);
+    numStreams = atoi(argv[2]);
+    segSize = inputSize / numStreams;
     // host copies of variables a, b & c
     int *a, *b, *c, *c_ref;
 
@@ -43,12 +47,12 @@ int main(int argc, char **argv)
 
     // Create streams
     START_TIMER;
-    cudaStream_t streams[NUM_STREAMS];
-    size_t streamSize = (inputSize + NUM_STREAMS - 1) / NUM_STREAMS;
-    size_t streamSizeByte = sizeof(int) * streamSize;
-    size_t lastStreamSize = inputSize - streamSize * (NUM_STREAMS - 1);
+    cudaStream_t streams[numStreams];
+    size_t segSize = (inputSize + numStreams - 1) / numStreams;
+    size_t segSizeByte = sizeof(int) * segSize;
+    size_t lastStreamSize = inputSize - segSize * (numStreams - 1);
     size_t lastStreamSizeByte = sizeof(int) * lastStreamSize;
-    for (int i = 0; i < NUM_STREAMS; i++)
+    for (int i = 0; i < numStreams; i++)
     {
         CUDA_CALL(cudaStreamCreate(&streams[i]));
     }
@@ -57,28 +61,28 @@ int main(int argc, char **argv)
 
     START_TIMER;
     int offset = 0;
-    for (int i = 0; i < NUM_STREAMS; i++)
+    for (int i = 0; i < numStreams; i++)
     {
-        offset = i * streamSize;
-        if (i == NUM_STREAMS - 1)
+        offset = i * segSize;
+        if (i == numStreams - 1)//last stream
         {
             CUDA_CALL(cudaMemcpyAsync(d_a + offset, a + offset, lastStreamSizeByte,cudaMemcpyHostToDevice, streams[i]));
             CUDA_CALL(cudaMemcpyAsync(d_b + offset, b + offset, lastStreamSizeByte,cudaMemcpyHostToDevice, streams[i]));
             CUDA_CALL(cudaStreamSynchronize(streams[i]));
             break;
         }
-        CUDA_CALL(cudaMemcpyAsync(d_a + offset, a + offset, streamSizeByte,cudaMemcpyHostToDevice, streams[i]));
-        CUDA_CALL(cudaMemcpyAsync(d_b + offset, b + offset, streamSizeByte,cudaMemcpyHostToDevice, streams[i]));
+        CUDA_CALL(cudaMemcpyAsync(d_a + offset, a + offset, segSizeByte,cudaMemcpyHostToDevice, streams[i]));
+        CUDA_CALL(cudaMemcpyAsync(d_b + offset, b + offset, segSizeByte,cudaMemcpyHostToDevice, streams[i]));
         CUDA_CALL(cudaStreamSynchronize(streams[i]));
     }
     END_TIMER;
     PRINT_TIMER("Host to Device Memcpy Time");
 
     START_TIMER;
-    for (int i = 0; i < NUM_STREAMS; i++)
+    for (int i = 0; i < numStreams; i++)
     {
-        offset = i * streamSize;
-        add<<<streamSize / THREAD_PER_BLOCK + 1, THREAD_PER_BLOCK, 0, streams[i]>>>(d_a + offset, d_b + offset, d_c + offset, streamSize);
+        offset = i * segSize;
+        add<<<segSize / THREAD_PER_BLOCK + 1, THREAD_PER_BLOCK, 0, streams[i]>>>(d_a + offset, d_b + offset, d_c + offset,segSize);
     }
     CUDA_CALL(cudaDeviceSynchronize());
     END_TIMER;
@@ -86,16 +90,16 @@ int main(int argc, char **argv)
 
 
     START_TIMER;
-    for (int i = 0; i < NUM_STREAMS; i++)
+    for (int i = 0; i < numStreams; i++)
     {
-        offset = i * streamSize;
-        if (i == NUM_STREAMS - 1)
+        offset = i * segSize;
+        if (i == numStreams - 1)//last stream
         {
             CUDA_CALL(cudaMemcpyAsync(c + offset, d_c + offset, lastStreamSizeByte,cudaMemcpyDeviceToHost, streams[i]));
             CUDA_CALL(cudaStreamSynchronize(streams[i]));
             break;
         }
-        CUDA_CALL(cudaMemcpyAsync(c + offset, d_c + offset, streamSizeByte,cudaMemcpyDeviceToHost, streams[i]));
+        CUDA_CALL(cudaMemcpyAsync(c + offset, d_c + offset, segSizeByte,cudaMemcpyDeviceToHost, streams[i]));
         CUDA_CALL(cudaStreamSynchronize(streams[i]));
     }
     END_TIMER;

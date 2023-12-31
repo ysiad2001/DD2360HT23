@@ -20,4 +20,35 @@ The situation is similar to the last question, blocks with ``blockIdx.x==ceil(60
 
 ## Exercise 2 - CUDA Streams
 
+### Compare to the non-streamed vector addition
+
+### Use nvprof to collect traces and nvvp to visualize the overlap of communication and computation
+
+### Impact of segment size on performance
+
 ## Exercise 3 - Heat Equation with using NVIDIA libraries
+
+### Approximate the FLOPS according to different dimX
+
+According to this algorithm
+```
+for i from 1 to nsteps:
+   tmp = A * temp
+   temp = alpha * tmp + temp 
+   norm = vectorNorm(tmp) 
+   if tmp < 1e-4 : 
+      break
+end
+```
+
+The sparse matrix-vector multiplication typically include ``2*nzv = 6*dimX-12`` FLOPs.
+
+AXPY operation requires ``2*dimX`` FLOPs.
+
+Vector Norm Calculation requires ``2*dimX`` FLOPs for the squaring and summing.
+
+In total there are ``10*dimX-12`` FLOPS per nstep.
+
+### Run the program with dimX=128 and vary nsteps from 100 to 10000
+
+### Compare the performance with and without the prefetching in Unified Memory
