@@ -43,9 +43,11 @@ We tried data size from 1024 to 10240000, yielding the graph as follows
 
 Some application of matrix multiplication include neural network, solution of linear system, and coordinate transformation.
 
-There are ``numAColumns`` number of floating point multiplications in a kernel.
+There are ``numCRows * numCColumns`` elements in matrix C, each element requires `` 2 * numAColumns`` floating point operations.
 
-There are ``numAColumns * 3`` global memory reads in each kernel. 
+There are `` 2 * numCRows * numCColumns * numAColumns`` number of floating point operation in the kernel.
+
+There are ``2 * numCRows * numCColumns * numAColumns`` global memory reads in the kernel. 
 
 For a matrix A of (128x128) and B of (128x128), there are 16 block and 1024 threads in each block used. The achieved occupancy is  99.60\%.
  

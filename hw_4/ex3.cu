@@ -6,6 +6,7 @@
 #include <cublas_v2.h>
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
+#include <cuda_profiler_api.h>
 
 #define gpuCheck(stmt)                                       \
     do                                                       \
@@ -192,7 +193,7 @@ int main(int argc, char **argv)
     //@@ Insert code to call cusparse api to get the buffer size needed by the sparse matrix per
     //@@ vector (SMPV) CSR routine of cuSPARSE
     cusparseCheck(cusparseSpMV_bufferSize(cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, Adescriptor,
-                                          tempDescriptor, &zero, tmpDescriptor, CUDA_R_64F, CUSPARSE_MV_ALG_DEFAULT, &bufferSize));
+                                          tempDescriptor, &zero, tmpDescriptor, CUDA_R_64F, CUSPARSE_SPMV_ALG_DEFAULT, &bufferSize));
 
     //@@ Insert code to allocate the buffer needed by cuSPARSE
     gpuCheck(cudaMalloc(&buffer, bufferSize));
@@ -204,7 +205,7 @@ int main(int argc, char **argv)
         //@@ the CSR matrix using cuSPARSE. This calculation corresponds to:
         //@@ tmp = 1 * A * temp + 0 * tmp
         cusparseCheck(cusparseSpMV(cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, Adescriptor,
-                                   tempDescriptor, &zero, tmpDescriptor, CUDA_R_64F, CUSPARSE_MV_ALG_DEFAULT, buffer));
+                                   tempDescriptor, &zero, tmpDescriptor, CUDA_R_64F, CUSPARSE_SPMV_ALG_DEFAULT, buffer));
         //@@ Insert code to call cublas api to compute the axpy routine using cuBLAS.
         //@@ This calculation corresponds to: temp = alpha * tmp + temp
         cublasCheck(cublasDaxpy(cublasHandle, dimX, &alpha, tmp, 1, temp, 1));

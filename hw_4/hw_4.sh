@@ -21,7 +21,7 @@ echo running ex2_stream with input from 1024 to 10240000 and 4 streams
 ./ex2_stream 102400000 4
 
 echo running ex2_stream with input 102400000 and 4 streams and profiling
-nvprof --output-profile ex2_stream_profile.nvprof ./ex2_stream 102400000
+nvprof --output-profile ex2_stream_profile.nvprof ./ex2_stream 102400000 4
 
 echo running ex2 with input 10240000 and 4 to 8 streams
 ./ex2_stream 10240000 4

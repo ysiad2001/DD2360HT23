@@ -22,9 +22,27 @@ The situation is similar to the last question, blocks with ``blockIdx.x==ceil(60
 
 ### Compare to the non-streamed vector addition
 
-### Use nvprof to collect traces and nvvp to visualize the overlap of communication and computation
+Performance of nonstream vector addition with input ranging 1024 to 102400000. The horizontal axis represent input size and vertical axis represent time in ms.
+
+![image](hw_4_ex2_nonstream.png)
+
+Performance of streaming vector addition with input ranging 1024 to 102400000 and 4 streams. The horizontal axis represent input size and vertical axis represent time in ms.
+
+![image](hw_4_ex2_stream.png)
+
+### Profiling
+
+```
+nvprof --output-profile ex2_stream_profile.nvprof ./ex2_stream 102400000 4
+```
+
+This command generates an output profile ``ex2_stream_profile.nvprof``.
 
 ### Impact of segment size on performance
+
+Performance of streaming vector addition with input 10240000 and 4 to 8 streams. The horizontal axis represent segment size and vertical axis represent time in ms.
+
+![image](hw_4_ex_2_different_segment_size.png)
 
 ## Exercise 3 - Heat Equation with using NVIDIA libraries
 
@@ -49,6 +67,23 @@ Vector Norm Calculation requires ``2*dimX`` FLOPs for the squaring and summing.
 
 In total there are ``10*dimX-12`` FLOPS per nstep.
 
+Apparantly more input size will cause the FLOP rate to approach the peak. But it is unrealistic to reach the peak, since the device may have some resources assigned to other tasks.
+
 ### Run the program with dimX=128 and vary nsteps from 100 to 10000
 
+It appears that the more nsteps, the less error the program produces,
+
+![image](hw_4_ex3_nstep_error.png)
+
+
 ### Compare the performance with and without the prefetching in Unified Memory
+
+Performance with prefetching
+
+![image](hw_4_ex3_with_prefetch.png)
+
+Performance without prefetching
+
+![image](hw_4_ex3_without_prefetch.png)
+
+With prefetching in Unified Memory, it is in theory faster to initialize data on the device, so it should be faster.
